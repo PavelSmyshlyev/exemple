@@ -1,0 +1,94 @@
+<?php
+
+namespace App\Services;
+
+use Illuminate\Http\File;
+use Illuminate\Http\Testing\File as TestingFile;
+use Illuminate\Http\UploadedFile;
+use Illuminate\Support\Facades\Storage;
+use Illuminate\Support\Str;
+
+/**
+ * Class StorageService
+ * @package App\Services
+ */
+class StorageService extends Service
+{
+    /**
+     * Get banners full storage path
+     *
+     * @return string
+     */
+    public static function getStorageUri()
+    {
+        if (config('filesystems.default') === 's3') {
+            $url = trim(config('filesystems.disks.s3.endpoint'), '/');
+            $bucket = trim(config('filesystems.disks.s3.bucket'), '/');
+            $root = trim(config('filesystems.disks.s3.root'), '/');
+
+            return $url . '/' . $bucket . '/' . $root . '/';
+        }
+
+        return config('filesystems.disks.local.url');
+    }
+
+    /**
+     * Put file to the storage
+     *
+     * @param File|TestingFile|UploadedFile $file
+     * @param string $dir
+     * @param string $fileName
+     * @return bool|string
+     */
+    public function putFile(File|TestingFile|UploadedFile $file, string $dir, string $fileName): bool|string
+    {
+        return Storage::disk('s3')->putFileAs($dir, $file, $fileName, ['visibility' => 'public']);
+    }
+
+    /**
+     * Delete file from the storage
+     *
+     * @param string $path
+     * @return bool
+     */
+    public function deleteFile(string $path): bool
+    {
+        if (Str::startsWith($path, 'default/')) {
+            return true;
+        }
+        return Storage::disk('s3')->delete($path);
+    }
+
+    /**
+     * Generate the random file name
+     *
+     * @param string $fileExt
+     * @return string
+     */
+    public function generateRandomFileName(string $fileExt): string
+    {
+        return Str::random().'.'.$fileExt;
+    }
+
+    /**
+     * Get file url
+     *
+     * @param string|null $path
+     * @return string|null
+     */
+    public function getUrl(?string $path): ?string
+    {
+        if (!$path) {
+            return $path;
+        }
+
+        $path = Str::replace([
+            'https://xxx.fra1.digitaloceanspaces.com/',
+            'https://static.stage.xxx.live/',
+            'https://static.xxx.live/',
+            'https://xxx.website.yandexcloud.net/',
+        ], '', $path);
+
+        return Storage::disk('s3')->url($path);
+    }
+}
